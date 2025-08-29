@@ -1,0 +1,7 @@
+.cache/
+.ssh/
+.bash_logout
+.bashrc
+.gitconfig
+.profile
+.wget-hsts
