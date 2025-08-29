@@ -1,0 +1,96 @@
+---
+- name: Setup App servers
+  hosts: app
+  become: yes
+  tasks:
+
+    # --- Ubuntu/Debian Docker ---
+    - name: Install dependencies (Ubuntu/Debian)
+      apt:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - software-properties-common
+        state: present
+        update_cache: yes
+      when: ansible_os_family == "Debian"
+
+    - name: Install Docker (Ubuntu/Debian)
+      apt:
+        name: docker.io
+        state: present
+      when: ansible_os_family == "Debian"
+
+    # --- CentOS/RHEL Docker ---
+    - name: Install dependencies (RHEL/CentOS)
+      yum:
+        name:
+          - yum-utils
+          - device-mapper-persistent-data
+          - lvm2
+        state: present
+      when: ansible_os_family == "RedHat"
+
+    - name: Remove podman-docker if present
+      yum:
+        name: podman-docker
+        state: absent
+      when: ansible_os_family == "RedHat"
+
+    - name: Add Docker repo (RHEL/CentOS)
+      yum_repository:
+        name: docker
+        description: Docker CE Repository
+        baseurl: https://download.docker.com/linux/centos/9/$basearch/stable
+        gpgcheck: yes
+        gpgkey: https://download.docker.com/linux/centos/gpg
+        state: present
+      when: ansible_os_family == "RedHat"
+
+    - name: Install Docker (RHEL/CentOS)
+      yum:
+        name: docker-ce
+        state: present
+      when: ansible_os_family == "RedHat"
+
+    - name: Enable and start Docker
+      service:
+        name: docker
+        state: started
+        enabled: yes
+
+# --- Database setup ---
+- name: Setup Database servers
+  hosts: database
+  become: yes
+  vars:
+    postgres_data_dir: "{{ postgres_data_dir | default('/var/lib/postgresql/data') }}"
+  tasks:
+
+    # --- Ubuntu/Debian PostgreSQL ---
+    - name: Install PostgreSQL (Ubuntu/Debian)
+      apt:
+        name: postgresql
+        state: present
+        update_cache: yes
+      when: ansible_os_family == "Debian"
+
+    # --- CentOS/RHEL PostgreSQL ---
+    - name: Install PostgreSQL (RHEL/CentOS)
+      yum:
+        name: postgresql-server
+        state: present
+      when: ansible_os_family == "RedHat"
+
+    - name: Initialize PostgreSQL database (CentOS/RHEL)
+      command: /usr/bin/postgresql-setup --initdb
+      args:
+        creates: "{{ postgres_data_dir }}"
+      when: ansible_os_family == "RedHat"
+
+    - name: Enable and start PostgreSQL
+      service:
+        name: postgresql
+        state: started
+        enabled: yes
